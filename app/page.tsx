@@ -17,6 +17,10 @@ export default function Home() {
   const [minConfidence, setMinConfidence] = useState(0.0);
   const [maxConfidence, setMaxConfidence] = useState(1.0);
 
+  // Feedback state
+  const [feedback, setFeedback] = useState("");
+  const [feedbackStatus, setFeedbackStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+
   useEffect(() => {
     fetchLogs();
   }, [minConfidence, maxConfidence]);
@@ -41,6 +45,23 @@ export default function Home() {
       setLogs(data || []);
     }
     setLoading(false);
+  };
+
+  const handleFeedbackSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feedback.trim()) return;
+
+    setFeedbackStatus("submitting");
+    const { error } = await supabase.from("feedback").insert({ content: feedback });
+
+    if (error) {
+      console.error("Error submitting feedback:", error);
+      setFeedbackStatus("error");
+    } else {
+      setFeedbackStatus("success");
+      setFeedback("");
+      setTimeout(() => setFeedbackStatus("idle"), 3000);
+    }
   };
 
   return (
@@ -162,6 +183,34 @@ export default function Home() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div className="mt-12 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <h3 className="mb-4 text-lg font-semibold">Feedback</h3>
+          <form onSubmit={handleFeedbackSubmit} className="space-y-4">
+            <textarea
+              className="w-full rounded-md border border-zinc-300 bg-transparent p-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 dark:border-zinc-700 dark:text-white"
+              rows={3}
+              placeholder="Tell us what you think..."
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+            />
+            <div className="flex items-center justify-between">
+              <button
+                type="submit"
+                disabled={feedbackStatus === "submitting"}
+                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {feedbackStatus === "submitting" ? "Sending..." : "Send Feedback"}
+              </button>
+              {feedbackStatus === "success" && (
+                <span className="text-sm text-green-600">Thank you for your feedback!</span>
+              )}
+              {feedbackStatus === "error" && (
+                <span className="text-sm text-red-600">Failed to send feedback.</span>
+              )}
+            </div>
+          </form>
         </div>
       </main>
 
