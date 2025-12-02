@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import { DetectionLog } from "./types";
-import AdminLoginModal from "./components/AdminLoginModal";
 import { format } from "date-fns";
 import { Shield, ShieldAlert, Search, Lock, Filter } from "lucide-react";
 
@@ -11,7 +10,6 @@ export default function Home() {
   const [logs, setLogs] = useState<DetectionLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   // Filter states
   const [minConfidence, setMinConfidence] = useState(0.0);
@@ -80,13 +78,6 @@ export default function Home() {
             <Shield className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
             <h1 className="text-xl font-bold">User Dashboard</h1>
           </div>
-          <button
-            onClick={() => setIsLoginModalOpen(true)}
-            className="flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
-          >
-            <Lock size={16} />
-            Admin Login
-          </button>
         </div>
       </header>
 
@@ -250,7 +241,6 @@ export default function Home() {
         </div>
       </main>
 
-      <AdminLoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
     </div>
   );
 }

@@ -15,19 +15,27 @@ export default function AdminPage() {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const ITEMS_PER_PAGE = 10;
+
+    // Auth state
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [password, setPassword] = useState("");
+    const [loginError, setLoginError] = useState("");
+
     const router = useRouter();
 
     useEffect(() => {
         // Simple client-side auth check
         const cookies = document.cookie.split(";");
         const authCookie = cookies.find((c) => c.trim().startsWith("admin_auth="));
-        if (!authCookie || !authCookie.includes("true")) {
-            router.push("/");
-            return;
-        }
 
-        fetchFeedback();
-    }, [router]);
+        if (authCookie && authCookie.includes("true")) {
+            setIsAuthenticated(true);
+            fetchFeedback();
+        } else {
+            setIsAuthenticated(false);
+            setLoading(false);
+        }
+    }, []);
 
     useEffect(() => {
         if (activeTab === "logs") {
@@ -85,8 +93,52 @@ export default function AdminPage() {
 
     const handleLogout = () => {
         document.cookie = "admin_auth=; path=/; max-age=0";
-        router.push("/");
+        setIsAuthenticated(false);
+        setPassword("");
+        setLoginError("");
     };
+
+    const handleLogin = () => {
+        if (password === "admin1234") {
+            document.cookie = "admin_auth=true; path=/; max-age=3600";
+            setIsAuthenticated(true);
+            fetchFeedback();
+        } else {
+            setLoginError("Incorrect password");
+        }
+    };
+
+    if (!isAuthenticated) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
+                <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900">
+                    <h2 className="mb-6 text-center text-2xl font-bold text-zinc-900 dark:text-white">Admin Login</h2>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Password</label>
+                            <input
+                                type="password"
+                                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                                value={password}
+                                onChange={(e) => {
+                                    setPassword(e.target.value);
+                                    setLoginError("");
+                                }}
+                                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                            />
+                            {loginError && <p className="mt-1 text-sm text-red-500">{loginError}</p>}
+                        </div>
+                        <button
+                            onClick={handleLogin}
+                            className="w-full rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        >
+                            Login
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
