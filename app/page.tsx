@@ -17,32 +17,40 @@ export default function Home() {
   const [minConfidence, setMinConfidence] = useState(0.0);
   const [maxConfidence, setMaxConfidence] = useState(1.0);
 
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
   // Feedback state
   const [feedback, setFeedback] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
 
   useEffect(() => {
     fetchLogs();
-  }, [minConfidence, maxConfidence]);
+  }, [page, minConfidence, maxConfidence]);
 
   const fetchLogs = async () => {
     setLoading(true);
     setError(null);
     let query = supabase
       .from("detection_logs")
-      .select("*")
+      .select("*", { count: "exact" })
       .order("created_at", { ascending: false })
       .gte("confidence", minConfidence)
       .lte("confidence", maxConfidence)
-      .limit(50);
+      .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1);
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
 
     if (error) {
       console.error("Error fetching logs:", error);
       setError(error.message);
     } else {
       setLogs(data || []);
+      if (count !== null) {
+        setTotalPages(Math.ceil(count / ITEMS_PER_PAGE) || 1);
+      }
     }
     setLoading(false);
   };
@@ -52,7 +60,7 @@ export default function Home() {
     if (!feedback.trim()) return;
 
     setFeedbackStatus("submitting");
-    const { error } = await supabase.from("feedback").insert({ content: feedback });
+    const { error } = await supabase.from("user_feedback").insert({ content: feedback });
 
     if (error) {
       console.error("Error submitting feedback:", error);
@@ -97,7 +105,10 @@ export default function Home() {
                   max="1"
                   step="0.1"
                   value={minConfidence}
-                  onChange={(e) => setMinConfidence(Number(e.target.value))}
+                  onChange={(e) => {
+                    setMinConfidence(Number(e.target.value));
+                    setPage(1);
+                  }}
                   className="w-16 rounded border border-zinc-300 bg-transparent px-1 py-0.5 text-sm dark:border-zinc-700"
                 />
                 <span className="text-zinc-400">-</span>
@@ -107,12 +118,15 @@ export default function Home() {
                   max="1"
                   step="0.1"
                   value={maxConfidence}
-                  onChange={(e) => setMaxConfidence(Number(e.target.value))}
+                  onChange={(e) => {
+                    setMaxConfidence(Number(e.target.value));
+                    setPage(1);
+                  }}
                   className="w-16 rounded border border-zinc-300 bg-transparent px-1 py-0.5 text-sm dark:border-zinc-700"
                 />
               </div>
             </div>
-            <button onClick={fetchLogs} className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+            <button onClick={() => fetchLogs()} className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
               Refresh
             </button>
           </div>
@@ -183,6 +197,28 @@ export default function Home() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* Pagination Controls */}
+        <div className="mt-4 flex items-center justify-center gap-4">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1 || loading}
+            className="rounded-full p-2 hover:bg-zinc-100 disabled:opacity-50 dark:hover:bg-zinc-800"
+          >
+            <Search className="rotate-180" size={20} style={{ display: 'none' }} /> {/* Hack to keep imports if needed, but better to use proper icons */}
+            <span className="text-sm font-medium">Previous</span>
+          </button>
+          <span className="text-sm text-zinc-500 dark:text-zinc-400">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages || loading}
+            className="rounded-full p-2 hover:bg-zinc-100 disabled:opacity-50 dark:hover:bg-zinc-800"
+          >
+            <span className="text-sm font-medium">Next</span>
+          </button>
         </div>
 
         <div className="mt-12 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">

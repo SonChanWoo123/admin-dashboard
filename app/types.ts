@@ -10,9 +10,14 @@ export interface DetectionLog {
     metadata: Record<string, any>;
 }
 
-export interface AppSetting {
-    key: string;
-    value: string;
-    description: string | null;
-    updated_at: string;
+
+export interface UserFeedback {
+    id: number;
+    created_at: string;
+    user_id: string | null;
+    category: string;
+    content: string;
+    contact_email: string | null;
+    status: string;
+    metadata: Record<string, any>;
 }
