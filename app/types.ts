@@ -7,6 +7,7 @@ export interface DetectionLog {
     model_version: string | null;
     is_harmful: boolean;
     user_id: string | null;
+    filter_mode: string;
     metadata: Record<string, any>;
 }
 

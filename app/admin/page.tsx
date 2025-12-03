@@ -12,7 +12,7 @@ export default function AdminPage() {
     const [feedbackPage, setFeedbackPage] = useState(1);
     const [hasMoreFeedback, setHasMoreFeedback] = useState(true);
     const [isFetchingFeedback, setIsFetchingFeedback] = useState(false);
-    const [logs, setLogs] = useState<DetectionLog[]>([]);
+    const [logs, setLogs] = useState<Pick<DetectionLog, "id" | "created_at" | "text_content" | "filter_mode" | "confidence" | "is_harmful">[]>([]);
     const [activeTab, setActiveTab] = useState<"feedback" | "logs">("feedback");
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
@@ -99,8 +99,8 @@ export default function AdminPage() {
         setLoading(true);
         const { data, error, count } = await supabase
             .from("detection_logs")
-            .select("*", { count: "exact" })
-            .order("created_at", { ascending: false })
+            .select("id, created_at, text_content, filter_mode, confidence, is_harmful", { count: "exact" })
+            .order("id", { ascending: false })
             .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1);
 
         if (error) {
@@ -335,7 +335,7 @@ export default function AdminPage() {
                                         <th className="px-6 py-3 font-medium">Content</th>
                                         <th className="px-6 py-3 font-medium">Status</th>
                                         <th className="px-6 py-3 font-medium">Confidence</th>
-                                        <th className="px-6 py-3 font-medium">Model</th>
+                                        <th className="px-6 py-3 font-medium">Filter Mode</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -377,7 +377,7 @@ export default function AdminPage() {
                                                     {(log.confidence * 100).toFixed(1)}%
                                                 </td>
                                                 <td className="whitespace-nowrap px-6 py-4 text-zinc-500 dark:text-zinc-400">
-                                                    {log.model_version || "-"}
+                                                    {log.filter_mode || "-"}
                                                 </td>
                                             </tr>
                                         ))
