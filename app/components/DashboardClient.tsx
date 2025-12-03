@@ -87,15 +87,32 @@ export default function DashboardClient({ initialUserId }: DashboardClientProps)
     if (!feedback.trim()) return;
 
     setFeedbackStatus("submitting");
-    const { error } = await supabase.from("feedback").insert({ content: feedback });
+    
+    try {
+      // user_feedback 테이블에 데이터 삽입 (admin 페이지와 동일한 테이블 사용)
+      const { data, error } = await supabase
+        .from("user_feedback")
+        .insert({
+          content: feedback,
+          category: "general",
+          status: "new",
+          user_id: userId || null
+        })
+        .select();
 
-    if (error) {
-      console.error("Error submitting feedback:", error);
+      if (error) {
+        console.error("Error submitting feedback:", error);
+        console.error("Error details:", JSON.stringify(error, null, 2));
+        setFeedbackStatus("error");
+      } else {
+        console.log("Feedback submitted successfully:", data);
+        setFeedbackStatus("success");
+        setFeedback("");
+        setTimeout(() => setFeedbackStatus("idle"), 3000);
+      }
+    } catch (err) {
+      console.error("Unexpected error submitting feedback:", err);
       setFeedbackStatus("error");
-    } else {
-      setFeedbackStatus("success");
-      setFeedback("");
-      setTimeout(() => setFeedbackStatus("idle"), 3000);
     }
   };
 
