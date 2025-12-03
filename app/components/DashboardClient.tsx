@@ -124,20 +124,10 @@ export default function DashboardClient({ initialUserId }: DashboardClientProps)
             <Shield className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
             <h1 className="text-xl font-bold">User Dashboard</h1>
           </div>
-          {userId && (
-            <div className="text-sm text-zinc-500 dark:text-zinc-400">
-              User ID: {userId}
-            </div>
-          )}
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl p-6">
-        {debugInfo && (
-          <div className="mb-4 rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
-            <strong>디버그 정보:</strong> {debugInfo}
-          </div>
-        )}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-2xl font-semibold">Detection Logs</h2>
 
