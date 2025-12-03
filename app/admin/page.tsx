@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
-import { AppSetting } from "../types";
+import { AppSetting, DetectionLog } from "../types";
 import { Settings, Save, LogOut, RefreshCw } from "lucide-react";
 
 export default function AdminPage() {
@@ -38,6 +38,29 @@ export default function AdminPage() {
         }
         setLoading(false);
     };
+
+    const [logs, setLogs] = useState<DetectionLog[]>([]);
+    const [loadingLogs, setLoadingLogs] = useState(true);
+
+    const fetchLogs = async () => {
+        setLoadingLogs(true);
+        const { data, error } = await supabase
+            .from("detection_logs")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(50);
+
+        if (error) {
+            console.error("Error fetching logs:", error);
+        } else {
+            setLogs(data || []);
+        }
+        setLoadingLogs(false);
+    };
+
+    useEffect(() => {
+        fetchLogs();
+    }, []);
 
     const handleUpdate = async (key: string, newValue: string) => {
         setSaving(key);
@@ -89,7 +112,7 @@ export default function AdminPage() {
                     </button>
                 </div>
 
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-12">
                     {loading ? (
                         <p className="col-span-full text-center text-zinc-500">Loading settings...</p>
                     ) : settings.length === 0 ? (
@@ -133,6 +156,69 @@ export default function AdminPage() {
                             </div>
                         ))
                     )}
+                </div>
+
+                <div className="mb-6 flex items-center justify-between">
+                    <h2 className="text-2xl font-semibold">Detection Logs</h2>
+                    <button onClick={fetchLogs} className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+                        <RefreshCw size={16} />
+                    </button>
+                </div>
+
+                <div className="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-zinc-50 dark:bg-zinc-800/50">
+                                <tr>
+                                    <th className="px-6 py-4 font-medium text-zinc-900 dark:text-zinc-100">ID</th>
+                                    <th className="px-6 py-4 font-medium text-zinc-900 dark:text-zinc-100">Date</th>
+                                    <th className="px-6 py-4 font-medium text-zinc-900 dark:text-zinc-100">Content</th>
+                                    <th className="px-6 py-4 font-medium text-zinc-900 dark:text-zinc-100">Confidence</th>
+                                    <th className="px-6 py-4 font-medium text-zinc-900 dark:text-zinc-100">Harmful</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                                {loadingLogs ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-8 text-center text-zinc-500">
+                                            Loading logs...
+                                        </td>
+                                    </tr>
+                                ) : logs.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-8 text-center text-zinc-500">
+                                            No logs found.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    logs.map((log) => (
+                                        <tr key={log.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                                            <td className="px-6 py-4 text-zinc-500 dark:text-zinc-400">{log.id}</td>
+                                            <td className="px-6 py-4 text-zinc-500 dark:text-zinc-400">
+                                                {new Date(log.created_at).toLocaleString()}
+                                            </td>
+                                            <td className="px-6 py-4 text-zinc-900 dark:text-zinc-100 max-w-xs truncate" title={log.text_content}>
+                                                {log.text_content}
+                                            </td>
+                                            <td className="px-6 py-4 text-zinc-500 dark:text-zinc-400">
+                                                {(log.confidence * 100).toFixed(1)}%
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span
+                                                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${log.is_harmful
+                                                        ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                                                        : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                                        }`}
+                                                >
+                                                    {log.is_harmful ? "Harmful" : "Safe"}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </main>
         </div>
