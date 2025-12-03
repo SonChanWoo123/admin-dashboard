@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
 import { UserFeedback, DetectionLog } from "../types";
@@ -9,6 +9,9 @@ import { format } from "date-fns";
 
 export default function AdminPage() {
     const [feedbackList, setFeedbackList] = useState<UserFeedback[]>([]);
+    const [feedbackPage, setFeedbackPage] = useState(1);
+    const [hasMoreFeedback, setHasMoreFeedback] = useState(true);
+    const [isFetchingFeedback, setIsFetchingFeedback] = useState(false);
     const [logs, setLogs] = useState<DetectionLog[]>([]);
     const [activeTab, setActiveTab] = useState<"feedback" | "logs">("feedback");
     const [loading, setLoading] = useState(true);
@@ -30,7 +33,6 @@ export default function AdminPage() {
 
         if (authCookie && authCookie.includes("true")) {
             setIsAuthenticated(true);
-            fetchFeedback();
         } else {
             setIsAuthenticated(false);
             setLoading(false);
@@ -38,22 +40,59 @@ export default function AdminPage() {
     }, []);
 
     useEffect(() => {
+        if (!isAuthenticated) return;
+
         if (activeTab === "logs") {
             fetchLogs();
+        } else if (activeTab === "feedback" && feedbackList.length === 0) {
+            fetchFeedback(1);
         }
-    }, [page, activeTab]);
+    }, [page, activeTab, isAuthenticated]);
 
-    const fetchFeedback = async () => {
+    const observer = useRef<IntersectionObserver | null>(null);
+    const lastFeedbackElementRef = useCallback((node: HTMLDivElement) => {
+        if (isFetchingFeedback) return;
+        if (observer.current) observer.current.disconnect();
+        observer.current = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && hasMoreFeedback) {
+                setFeedbackPage(prevPage => prevPage + 1);
+            }
+        });
+        if (node) observer.current.observe(node);
+    }, [isFetchingFeedback, hasMoreFeedback]);
+
+    useEffect(() => {
+        if (feedbackPage > 1) {
+            fetchFeedback(feedbackPage);
+        }
+    }, [feedbackPage]);
+
+    const fetchFeedback = async (pageToFetch: number) => {
+        if (isFetchingFeedback) return;
+        setIsFetchingFeedback(true);
+
+        const from = (pageToFetch - 1) * ITEMS_PER_PAGE;
+        const to = from + ITEMS_PER_PAGE - 1;
+
         const { data, error } = await supabase
             .from("user_feedback")
             .select("*")
-            .order("created_at", { ascending: false });
+            .order("created_at", { ascending: false })
+            .range(from, to);
 
         if (error) {
             console.error("Error fetching feedback:", error);
         } else {
-            setFeedbackList(data || []);
+            if (data && data.length > 0) {
+                setFeedbackList(prev => pageToFetch === 1 ? data : [...prev, ...data]);
+                if (data.length < ITEMS_PER_PAGE) {
+                    setHasMoreFeedback(false);
+                }
+            } else {
+                setHasMoreFeedback(false);
+            }
         }
+        setIsFetchingFeedback(false);
     };
 
     const fetchLogs = async () => {
@@ -102,7 +141,7 @@ export default function AdminPage() {
         if (password === "admin1234") {
             document.cookie = "admin_auth=true; path=/; max-age=3600";
             setIsAuthenticated(true);
-            fetchFeedback();
+            // fetchFeedback will be triggered by useEffect
         } else {
             setLoginError("Incorrect password");
         }
@@ -181,7 +220,12 @@ export default function AdminPage() {
                     </div>
                     <button
                         onClick={() => {
-                            fetchFeedback();
+                            if (activeTab === "feedback") {
+                                setFeedbackPage(1);
+                                setHasMoreFeedback(true);
+                                setFeedbackList([]);
+                                fetchFeedback(1);
+                            }
                             if (activeTab === "logs") fetchLogs();
                         }}
                         className="text-sm text-indigo-600 hover:underline dark:text-indigo-400"
@@ -192,45 +236,93 @@ export default function AdminPage() {
 
                 {activeTab === "feedback" ? (
                     <div className="space-y-4">
-                        {feedbackList.length === 0 ? (
+                        {feedbackList.length === 0 && !isFetchingFeedback ? (
                             <p className="text-center text-zinc-500">No feedback found.</p>
                         ) : (
-                            feedbackList.map((feedback) => (
-                                <div
-                                    key={feedback.id}
-                                    className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-                                >
-                                    <div className="mb-4 flex items-start justify-between">
-                                        <div>
-                                            <span className="mb-2 inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
-                                                {feedback.category}
-                                            </span>
-                                            <p className="mt-1 text-zinc-900 dark:text-white">{feedback.content}</p>
-                                        </div>
-                                        <select
-                                            value={feedback.status}
-                                            onChange={(e) => handleUpdateFeedbackStatus(feedback.id, e.target.value)}
-                                            className={`rounded-md border px-2 py-1 text-xs font-medium ${feedback.status === "new"
-                                                ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-                                                : feedback.status === "read"
-                                                    ? "border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400"
-                                                    : "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-400"
-                                                }`}
+                            feedbackList.map((feedback, index) => {
+                                if (feedbackList.length === index + 1) {
+                                    return (
+                                        <div
+                                            ref={lastFeedbackElementRef}
+                                            key={feedback.id}
+                                            className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
                                         >
-                                            <option value="new">New</option>
-                                            <option value="read">Read</option>
-                                            <option value="resolved">Resolved</option>
-                                        </select>
-                                    </div>
-                                    <div className="flex items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
-                                        <span>{new Date(feedback.created_at).toLocaleString()}</span>
-                                        {feedback.contact_email && (
-                                            <span>Email: {feedback.contact_email}</span>
-                                        )}
-                                        {feedback.user_id && <span>User ID: {feedback.user_id}</span>}
-                                    </div>
-                                </div>
-                            ))
+                                            <div className="mb-4 flex items-start justify-between">
+                                                <div>
+                                                    <span className="mb-2 inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                                                        {feedback.category}
+                                                    </span>
+                                                    <p className="mt-1 text-zinc-900 dark:text-white">{feedback.content}</p>
+                                                </div>
+                                                <select
+                                                    value={feedback.status}
+                                                    onChange={(e) => handleUpdateFeedbackStatus(feedback.id, e.target.value)}
+                                                    className={`rounded-md border px-2 py-1 text-xs font-medium ${feedback.status === "new"
+                                                        ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                                                        : feedback.status === "read"
+                                                            ? "border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400"
+                                                            : "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                                        }`}
+                                                >
+                                                    <option value="new">New</option>
+                                                    <option value="read">Read</option>
+                                                    <option value="resolved">Resolved</option>
+                                                </select>
+                                            </div>
+                                            <div className="flex items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+                                                <span>{new Date(feedback.created_at).toLocaleString()}</span>
+                                                {feedback.contact_email && (
+                                                    <span>Email: {feedback.contact_email}</span>
+                                                )}
+                                                {feedback.user_id && <span>User ID: {feedback.user_id}</span>}
+                                            </div>
+                                        </div>
+                                    );
+                                } else {
+                                    return (
+                                        <div
+                                            key={feedback.id}
+                                            className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                                        >
+                                            <div className="mb-4 flex items-start justify-between">
+                                                <div>
+                                                    <span className="mb-2 inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                                                        {feedback.category}
+                                                    </span>
+                                                    <p className="mt-1 text-zinc-900 dark:text-white">{feedback.content}</p>
+                                                </div>
+                                                <select
+                                                    value={feedback.status}
+                                                    onChange={(e) => handleUpdateFeedbackStatus(feedback.id, e.target.value)}
+                                                    className={`rounded-md border px-2 py-1 text-xs font-medium ${feedback.status === "new"
+                                                        ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                                                        : feedback.status === "read"
+                                                            ? "border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400"
+                                                            : "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                                        }`}
+                                                >
+                                                    <option value="new">New</option>
+                                                    <option value="read">Read</option>
+                                                    <option value="resolved">Resolved</option>
+                                                </select>
+                                            </div>
+                                            <div className="flex items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+                                                <span>{new Date(feedback.created_at).toLocaleString()}</span>
+                                                {feedback.contact_email && (
+                                                    <span>Email: {feedback.contact_email}</span>
+                                                )}
+                                                {feedback.user_id && <span>User ID: {feedback.user_id}</span>}
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                            })
+                        )}
+                        {isFetchingFeedback && (
+                            <div className="py-4 text-center text-zinc-500">Loading more feedback...</div>
+                        )}
+                        {!hasMoreFeedback && feedbackList.length > 0 && (
+                            <div className="py-4 text-center text-zinc-500">No more feedback</div>
                         )}
                     </div>
                 ) : (
