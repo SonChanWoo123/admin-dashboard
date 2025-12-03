@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { DetectionLog } from "../types";
-import AdminLoginModal from "./AdminLoginModal";
 import { format } from "date-fns";
-import { Shield, ShieldAlert, Search, Lock, Filter } from "lucide-react";
+import { Shield, ShieldAlert, Filter } from "lucide-react";
 
 interface DashboardClientProps {
   initialUserId: string | null;
@@ -15,7 +14,6 @@ export default function DashboardClient({ initialUserId }: DashboardClientProps)
   const [logs, setLogs] = useState<DetectionLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(initialUserId);
   const [debugInfo, setDebugInfo] = useState<string>("");
 
@@ -109,18 +107,10 @@ export default function DashboardClient({ initialUserId }: DashboardClientProps)
             <Shield className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
             <h1 className="text-xl font-bold">User Dashboard</h1>
           </div>
-          {userId ? (
+          {userId && (
             <div className="text-sm text-zinc-500 dark:text-zinc-400">
               User ID: {userId}
             </div>
-          ) : (
-            <button
-              onClick={() => setIsLoginModalOpen(true)}
-              className="flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
-            >
-              <Lock size={16} />
-              Admin Login
-            </button>
           )}
         </div>
       </header>
@@ -261,8 +251,6 @@ export default function DashboardClient({ initialUserId }: DashboardClientProps)
           </form>
         </div>
       </main>
-
-      <AdminLoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
     </div>
   );
 }
